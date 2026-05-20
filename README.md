@@ -50,17 +50,22 @@ Controle de data de início e fim aplicado sobre ambas as bases (KIWIFY e META A
 
 ---
 
-## ⚙️ Configuração da planilha (obrigatório)
+## ⚙️ Arquitetura — Cloudflare Worker
 
-A planilha precisa estar **pública para leitura** no Google Sheets:
+Os dados são buscados via **Cloudflare Worker** (proxy seguro), que autentica na Google Sheets API com uma Service Account. A planilha pode permanecer **privada**.
 
-1. Abra a planilha em `docs.google.com/spreadsheets`
-2. `Arquivo → Compartilhar → Publicar na web`
-3. Ou: `Compartilhar → Qualquer pessoa com o link → Visualizador`
+**Worker:** `https://raspy-bush-2c66.henrscard.workers.dev`
 
-O dashboard usa a API pública do Google Sheets via `gviz/tq?out=csv`. Não exige chave de API.
+**Secrets configurados no Worker:**
+| Secret | Valor |
+|---|---|
+| `SHEET_ID` | ID da planilha Google |
+| `GOOGLE_SA_KEY` | JSON completo da Service Account |
 
-**ID da planilha configurado:** `1bPxq4nmFicmJihL1uKtnQMcgXSD0hYIZwgL14xPSL-s`
+**Service Account com acesso à planilha (Visualizador):**
+`cromador-dashboard@analise-de-dados-mallet.iam.gserviceaccount.com`
+
+A planilha **não precisa ser pública**. O Worker autentica via JWT gerado a partir da chave da Service Account.
 
 ---
 
