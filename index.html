@@ -456,8 +456,7 @@
       <div class="chart-title">CAC por dia <span>linha · tráfego pago</span></div>
       <div class="legend-row">
         <div class="legend-item"><span class="legend-dot" style="background:#5a8fd4"></span>CAC</div>
-        <div class="legend-item"><span class="legend-dot" style="background:#e05c4b;border-radius:50%"></span>Investimento</div>
-        <div class="legend-item"><span class="legend-dot" style="background:#5aab7a;border-radius:50%"></span>Vendas pagas</div>
+        <div class="legend-item"><span class="legend-dot" style="background:#6b6358;border-radius:50%"></span>Investimento</div>
       </div>
       <div class="chart-wrap" style="height:220px">
         <canvas id="chartCAC" role="img" aria-label="CAC por dia">Carregando...</canvas>
@@ -822,29 +821,43 @@ function render(kiwify, meta) {
           label: 'CAC',
           data: cacPorDia.map(v => Math.round(v * 100) / 100),
           borderColor: '#5a8fd4',
+          backgroundColor: 'rgba(90,143,212,0.06)',
           pointBackgroundColor: '#5a8fd4',
           pointRadius: 3,
           tension: 0.3,
-          yAxisID: 'y'
+          fill: true,
+          yAxisID: 'yCAC'
         },
         {
           label: 'Investimento',
           data: dates.map(d => Math.round((invPorDia[d] || 0) * 100) / 100),
-          borderColor: '#e05c4b',
-          pointBackgroundColor: '#e05c4b',
+          borderColor: '#6b6358',
+          pointBackgroundColor: '#6b6358',
           pointRadius: 2,
           tension: 0.3,
           borderDash: [4, 3],
-          yAxisID: 'y'
+          yAxisID: 'yInv'
         }
       ]
     },
     options: {
       responsive: true, maintainAspectRatio: false,
+      interaction: { mode: 'index', intersect: false },
       plugins: { legend: { display: false } },
       scales: {
         x: { ticks: { color: '#6b6358', font: { size: 10 } }, grid: { color: 'rgba(255,255,255,0.04)' } },
-        y: { ticks: { color: '#6b6358', font: { size: 10 }, callback: v => 'R$' + v.toLocaleString('pt-BR') }, grid: { color: 'rgba(255,255,255,0.04)' }, beginAtZero: true }
+        yCAC: {
+          position: 'left',
+          beginAtZero: true,
+          ticks: { color: '#5a8fd4', font: { size: 10 }, callback: v => 'R$' + v.toLocaleString('pt-BR') },
+          grid: { color: 'rgba(255,255,255,0.04)' }
+        },
+        yInv: {
+          position: 'right',
+          beginAtZero: true,
+          ticks: { color: '#6b6358', font: { size: 10 }, callback: v => 'R$' + v.toLocaleString('pt-BR') },
+          grid: { drawOnChartArea: false }
+        }
       }
     }
   });
