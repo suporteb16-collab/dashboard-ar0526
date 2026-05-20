@@ -740,10 +740,16 @@ function render(kiwify, meta) {
     invPagoPorDia[d] = (invPagoPorDia[d] || 0) + spend;
   });
 
+  // CAC acumulado por dia: mesma lógica do card mas running
+  // Se não há vendas pagas em nenhum dia, usa total como fallback por dia de investimento
+  const totalPagoVendas = paid.filter(r => isPago(r)).length;
   const cacPorDia = dates.map(d => {
-    const inv = invPorDia[d] || 0;
-    const v = vendPagoPorDia[d] || 0;
-    return v > 0 ? inv / v : null;
+    const invD = invPorDia[d] || 0;
+    const vD = vendPagoPorDia[d] || 0;
+    if (vD > 0 && invD > 0) return invD / vD;          // dia com vendas pagas e investimento
+    if (vD > 0) return totalInv / totalPagoVendas;      // dia com vendas pagas mas sem investimento no dia
+    if (invD > 0 && totalPagoVendas > 0) return totalInv / totalPagoVendas; // dia com investimento: usa CAC geral
+    return null;
   });
 
   const lbls = dates.map(d => { const p = d.split('-'); return p[2] + '-' + p[1]; });
