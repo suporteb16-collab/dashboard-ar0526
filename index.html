@@ -648,10 +648,14 @@ function getLote(fat) {
 }
 
 function isPago(row) {
-  const src = (row['TrackingParameters_utm_source'] || '').toLowerCase();
-  const med = (row['TrackingParameters_utm_medium'] || '').toLowerCase();
-  return src.includes('quente') || src.includes('frio') ||
-         med.includes('quente') || med.includes('frio');
+  const fields = [
+    row['TrackingParameters_utm_source'] || '',
+    row['TrackingParameters_utm_medium'] || '',
+    row['TrackingParameters_src']        || '',
+    row['TrackingParameters_sck']        || '',
+    row['TrackingParameters_utm_campaign']|| '',
+  ];
+  return fields.some(f => f.toLowerCase().includes('quente') || f.toLowerCase().includes('frio'));
 }
 
 function filterData(kiwify, meta, from, to) {
