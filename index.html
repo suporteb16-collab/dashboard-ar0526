@@ -759,7 +759,7 @@ function render(kiwify, meta) {
       labels: lbls,
       datasets: [{
         label: 'Faturamento',
-        data: dates.map(d => Math.round(fatPorDia[d] || 0)),
+        data: dates.map(d => Math.round((fatPorDia[d] || 0) * 100) / 100),
         borderColor: '#c9a84c',
         backgroundColor: 'rgba(201,168,76,0.08)',
         pointBackgroundColor: '#c9a84c',
@@ -769,10 +769,10 @@ function render(kiwify, meta) {
     },
     options: {
       responsive: true, maintainAspectRatio: false,
-      plugins: { legend: { display: false } },
+      plugins: { legend: { display: false }, tooltip: { callbacks: { label: ctx => 'R$ ' + ctx.parsed.y.toLocaleString('pt-BR', {minimumFractionDigits:2, maximumFractionDigits:2}) } } },
       scales: {
         x: { ticks: { color: '#6b6358', font: { size: 10 } }, grid: { color: 'rgba(255,255,255,0.04)' } },
-        y: { ticks: { color: '#6b6358', font: { size: 10 }, callback: v => 'R$' + (v/1).toLocaleString('pt-BR') }, grid: { color: 'rgba(255,255,255,0.04)' }, beginAtZero: true }
+        y: { ticks: { color: '#6b6358', font: { size: 10 }, callback: v => 'R$ ' + v.toLocaleString('pt-BR', {minimumFractionDigits:2, maximumFractionDigits:2}) }, grid: { color: 'rgba(255,255,255,0.04)' }, beginAtZero: true }
       }
     }
   });
@@ -794,10 +794,10 @@ function render(kiwify, meta) {
     },
     options: {
       responsive: true, maintainAspectRatio: false,
-      plugins: { legend: { display: false } },
+      plugins: { legend: { display: false }, tooltip: { callbacks: { label: ctx => 'R$ ' + ctx.parsed.y.toLocaleString('pt-BR', {minimumFractionDigits:2, maximumFractionDigits:2}) } } },
       scales: {
         x: { ticks: { color: '#6b6358', font: { size: 10 } }, grid: { color: 'rgba(255,255,255,0.04)' } },
-        y: { ticks: { color: '#6b6358', font: { size: 10 }, callback: v => 'R$' + v.toLocaleString('pt-BR') }, grid: { color: 'rgba(255,255,255,0.04)' }, beginAtZero: true }
+        y: { ticks: { color: '#6b6358', font: { size: 10 }, callback: v => 'R$ ' + v.toLocaleString('pt-BR', {minimumFractionDigits:2, maximumFractionDigits:2}) }, grid: { color: 'rgba(255,255,255,0.04)' }, beginAtZero: true }
       }
     }
   });
