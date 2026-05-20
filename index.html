@@ -559,15 +559,17 @@
 </main>
 
 <script>
-const SHEET_ID = '1bPxq4nmFicmJihL1uKtnQMcgXSD0hYIZwgL14xPSL-s';
-const KIWIFY_RANGE = 'KIWIFY!A1:BZ2000';
-const META_RANGE = 'META%20ADS!A1:Z2000';
+const WORKER_URL = 'https://raspy-bush-2c66.henrscard.workers.dev';
 
 let allKiwify = [], allMeta = [], charts = {};
 
-async function fetchSheet(range) {
-  const url = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv&range=${range}`;
+async function fetchSheet(sheetName) {
+  const url = `${WORKER_URL}?sheet=${encodeURIComponent(sheetName)}`;
   const res = await fetch(url);
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ error: res.statusText }));
+    throw new Error(err.error || res.statusText);
+  }
   const text = await res.text();
   return parseCSV(text);
 }
@@ -1111,8 +1113,8 @@ function resetFilter() {
 async function init() {
   try {
     const [kData, mData] = await Promise.all([
-      fetchSheet('KIWIFY!A1:BZ5000'),
-      fetchSheet('META%20ADS!A1:Z5000')
+      fetchSheet('KIWIFY'),
+      fetchSheet('META ADS')
     ]);
     allKiwify = kData;
     allMeta = mData;
@@ -1125,7 +1127,7 @@ async function init() {
 
     render(allKiwify, allMeta);
   } catch (e) {
-    document.querySelector('.cards').innerHTML = `<div style="grid-column:1/-1;padding:24px;color:var(--red);font-size:13px;">Erro ao carregar dados: ${e.message}. Verifique se a planilha está pública (Visualizador).</div>`;
+    document.querySelector('.cards').innerHTML = `<div style="grid-column:1/-1;padding:24px;color:var(--red);font-size:13px;">Erro ao carregar dados via Worker: ${e.message}. Verifique se os Secrets SHEET_ID e GOOGLE_SA_KEY estão configurados no Worker.</div>`;
   }
 }
 
