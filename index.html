@@ -531,20 +531,14 @@
       </div>
     </div>
     <div class="chart-box">
-      <div class="chart-title">Aprovação de cartão</div>
+      <div class="chart-title">Vendas por método de pagamento</div>
       <div class="chart-wrap" style="height:220px">
-        <canvas id="chartCard" role="img" aria-label="Aprovação de cartão">Carregando...</canvas>
+        <canvas id="chartPayMethod" role="img" aria-label="Vendas por método de pagamento">Carregando...</canvas>
       </div>
     </div>
   </div>
 
   <div class="charts-grid" style="margin-top:16px">
-    <div class="chart-box">
-      <div class="chart-title">Vendas por método de pagamento <span>Alma Romântica · paid</span></div>
-      <div class="chart-wrap" style="height:240px">
-        <canvas id="chartPayMethod" role="img" aria-label="Vendas por método de pagamento">Carregando...</canvas>
-      </div>
-    </div>
     <div class="chart-box">
       <div class="chart-title">Faturamento por método de pagamento <span>Alma Romântica · paid</span></div>
       <div class="chart-wrap" style="height:240px">
@@ -637,9 +631,9 @@ function getLote(fat) {
   return 'Outro';
 }
 
-function isPago(medium) {
-  const m = (medium || '').toLowerCase();
-  return m === 'quente' || m === 'frio';
+function isPago(row) {
+  const src = (row['TrackingParameters_utm_source'] || '').toLowerCase();
+  return src.includes('quente') || src.includes('frio');
 }
 
 function filterData(kiwify, meta, from, to) {
@@ -683,7 +677,7 @@ function render(kiwify, meta) {
 
   // ROAS = faturamento de vendas pagas via tráfego pago / investimento total Meta Ads
   // CAC = investimento total Meta Ads / vendas vindas de tráfego pago
-  const pagoRows = paid.filter(r => isPago(r['TrackingParameters_utm_medium']));
+  const pagoRows = paid.filter(r => isPago(r));
   const pagoFat = pagoRows.reduce((s, r) => s + parseFat(r['Faturamento']), 0);
   const pagoVendas = pagoRows.length;
   const roas = totalInv > 0 ? pagoFat / totalInv : 0;
@@ -707,7 +701,7 @@ function render(kiwify, meta) {
     if (!d) return;
     vendPorDia[d] = (vendPorDia[d] || 0) + 1;
     fatPorDia[d] = (fatPorDia[d] || 0) + parseFat(r['Faturamento']);
-    if (isPago(r['TrackingParameters_utm_medium'])) {
+    if (isPago(r)) {
       vendPagoPorDia[d] = (vendPagoPorDia[d] || 0) + 1;
     }
   });
@@ -843,7 +837,6 @@ function render(kiwify, meta) {
   renderTblLote(paid);
   renderChartOrigem(paid);
   renderChartStatus(kRows, paid);
-  renderChartCard(paid);
   renderChartPayMethod(paid);
 
   const minDate = dates[0] || '';
@@ -952,7 +945,7 @@ function renderTblLote(paid) {
 }
 
 function renderChartOrigem(paid) {
-  const pago = paid.filter(r => isPago(r['TrackingParameters_utm_medium'])).length;
+  const pago = paid.filter(r => isPago(r)).length;
   const org = paid.length - pago;
   destroyChart('chartOrigem');
   charts.chartOrigem = new Chart(document.getElementById('chartOrigem'), {
@@ -1054,23 +1047,22 @@ function renderChartPayMethod(paid) {
 
   destroyChart('chartPayMethod');
   charts.chartPayMethod = new Chart(document.getElementById('chartPayMethod'), {
-    type: 'bar',
+    type: 'doughnut',
     data: {
       labels,
       datasets: [{
-        label: 'Vendas',
         data: labels.map(l => methodMap[l]),
         backgroundColor: labels.map((_, i) => palette[i % palette.length]),
-        borderRadius: 5,
-        barThickness: 32
+        borderColor: '#1a1814',
+        borderWidth: 3,
+        hoverOffset: 6
       }]
     },
     options: {
       responsive: true, maintainAspectRatio: false,
-      plugins: { legend: { display: false } },
-      scales: {
-        x: { ticks: { color: '#9b9385', font: { size: 11 } }, grid: { color: 'rgba(255,255,255,0.04)' } },
-        y: { ticks: { color: '#6b6358', font: { size: 10 } }, grid: { color: 'rgba(255,255,255,0.04)' }, beginAtZero: true }
+      cutout: '60%',
+      plugins: {
+        legend: { position: 'bottom', labels: { color: '#9b9385', font: { size: 11 }, padding: 12, boxWidth: 12 } }
       }
     }
   });
