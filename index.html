@@ -125,6 +125,21 @@
 
   .btn-reset:hover { border-color: var(--gold); color: var(--gold); }
 
+  .btn-refresh {
+    background: transparent;
+    border: 1px solid var(--border2);
+    border-radius: var(--radius);
+    color: var(--gold);
+    font-family: 'DM Sans', sans-serif;
+    font-size: 13px;
+    padding: 7px 14px;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .btn-refresh:hover { background: var(--gold-dim); border-color: var(--gold); }
+  .btn-refresh.loading { opacity: 0.5; pointer-events: none; animation: spin 1s linear infinite; }
+  @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+
   main { padding: 28px 32px; max-width: 1400px; margin: 0 auto; }
 
   .section-title {
@@ -364,6 +379,7 @@
   <div class="header-left">
     <h1>♩ Alma Romântica — Dashboard de Performance</h1>
     <p id="header-range">Carregando dados...</p>
+    <p id="last-updated" style="font-size:11px;color:var(--text3);margin-top:2px;">—</p>
   </div>
   <div class="filters">
     <div class="filter-group">
@@ -376,6 +392,7 @@
     </div>
     <button class="btn-filter" onclick="applyFilter()">Filtrar</button>
     <button class="btn-reset" onclick="resetFilter()">Limpar</button>
+    <button class="btn-refresh" onclick="refreshData()" id="btn-refresh" title="Buscar dados atualizados">↻ Atualizar</button>
   </div>
 </header>
 
@@ -842,6 +859,8 @@ function render(kiwify, meta) {
   const minDate = dates[0] || '';
   const maxDate = dates[dates.length - 1] || '';
   document.getElementById('header-range').textContent = minDate && maxDate ? `Período: ${minDate} → ${maxDate}` : 'Todos os dados';
+  const now = new Date();
+  document.getElementById('last-updated').textContent = 'Atualizado em ' + now.toLocaleDateString('pt-BR') + ' às ' + now.toLocaleTimeString('pt-BR', {hour:'2-digit', minute:'2-digit'});
 }
 
 function renderTblMedium(paid, mRows) {
@@ -1100,6 +1119,26 @@ function resetFilter() {
   document.getElementById('date-from').value = '';
   document.getElementById('date-to').value = '';
   render(allKiwify, allMeta);
+}
+
+async function refreshData() {
+  const btn = document.getElementById('btn-refresh');
+  btn.textContent = '↻';
+  btn.classList.add('loading');
+  try {
+    const [kData, mData] = await Promise.all([
+      fetchSheet('KIWIFY'),
+      fetchSheet('META ADS')
+    ]);
+    allKiwify = kData;
+    allMeta = mData;
+    render(allKiwify, allMeta);
+  } catch(e) {
+    alert('Erro ao atualizar: ' + e.message);
+  } finally {
+    btn.textContent = '↻ Atualizar';
+    btn.classList.remove('loading');
+  }
 }
 
 async function init() {
