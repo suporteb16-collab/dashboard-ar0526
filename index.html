@@ -727,15 +727,6 @@ function render(kiwify, meta) {
   // CAC acumulado por dia: mesma lógica do card mas running
   // Se não há vendas pagas em nenhum dia, usa total como fallback por dia de investimento
   const totalPagoVendas = paid.filter(r => isPago(r)).length;
-  const cacPorDia = dates.map(d => {
-    const invD = invPorDia[d] || 0;
-    const vD = vendPagoPorDia[d] || 0;
-    if (vD > 0 && invD > 0) return invD / vD;          // dia com vendas pagas e investimento
-    if (vD > 0) return totalInv / totalPagoVendas;      // dia com vendas pagas mas sem investimento no dia
-    if (invD > 0 && totalPagoVendas > 0) return totalInv / totalPagoVendas; // dia com investimento: usa CAC geral
-    return null;
-  });
-
   const lbls = dates.map(d => { const p = d.split('-'); return p[2] + '-' + p[1]; });
 
   destroyChart('chartVendas');
@@ -811,57 +802,7 @@ function render(kiwify, meta) {
     }
   });
 
-  destroyChart('chartCAC');
-  charts.chartCAC = new Chart(document.getElementById('chartCAC'), {
-    type: 'line',
-    data: {
-      labels: lbls,
-      datasets: [
-        {
-          label: 'CAC',
-          data: cacPorDia.map(v => v !== null ? Math.round(v * 100) / 100 : null),
-          borderColor: '#5a8fd4',
-          backgroundColor: 'rgba(90,143,212,0.06)',
-          pointBackgroundColor: '#5a8fd4',
-          pointRadius: 3,
-          tension: 0.3,
-          fill: true,
-          spanGaps: false,
-          yAxisID: 'yCAC'
-        },
-        {
-          label: 'Investimento',
-          data: dates.map(d => Math.round((invPorDia[d] || 0) * 100) / 100),
-          borderColor: '#4a4540',
-          pointBackgroundColor: '#4a4540',
-          pointRadius: 2,
-          tension: 0.3,
-          borderDash: [4, 3],
-          yAxisID: 'yInv'
-        }
-      ]
-    },
-    options: {
-      responsive: true, maintainAspectRatio: false,
-      interaction: { mode: 'index', intersect: false },
-      plugins: { legend: { display: false } },
-      scales: {
-        x: { ticks: { color: '#6b6358', font: { size: 10 } }, grid: { color: 'rgba(255,255,255,0.04)' } },
-        yCAC: {
-          position: 'left',
-          beginAtZero: true,
-          ticks: { color: '#5a8fd4', font: { size: 10 }, callback: v => 'R$' + v.toLocaleString('pt-BR') },
-          grid: { color: 'rgba(255,255,255,0.04)' }
-        },
-        yInv: {
-          position: 'right',
-          beginAtZero: true,
-          ticks: { color: '#6b6358', font: { size: 10 }, callback: v => 'R$' + v.toLocaleString('pt-BR') },
-          grid: { drawOnChartArea: false }
-        }
-      }
-    }
-  });
+
 
   renderTblMedium(paid, mRows);
   renderTblContent(paid, mRows);
@@ -1100,28 +1041,1108 @@ function renderChartPayMethod(paid) {
     }
   });
 
-  destroyChart('chartPayFat');
-  charts.chartPayFat = new Chart(document.getElementById('chartPayFat'), {
+
+}
+
+function destroyChart(id) {
+  if (charts[id]) { charts[id].destroy(); delete charts[id]; }
+}
+
+function applyFilter() { render(allKiwify, allMeta); }
+function resetFilter() {
+  document.getElementById('date-from').value = '';
+  document.getElementById('date-to').value = '';
+  render(allKiwify, allMeta);
+}
+
+async function refreshData() {
+  const btn = document.getElementById('btn-refresh');
+  btn.textContent = '↻';
+  btn.classList.add('loading');
+  try {
+    const [kData, mData] = await Promise.all([
+      fetchSheet('KIWIFY'),
+      fetchSheet('META ADS')
+    ]);
+    allKiwify = kData;
+    allMeta = mData;
+    render(allKiwify, allMeta);
+  } catch(e) {
+    alert('Erro ao atualizar: ' + e.message);
+  } finally {
+    btn.textContent = '↻ Atualizar';
+    btn.classList.remove('loading');
+  }
+}
+
+async function init() {
+  try {
+    const [kData, mData] = await Promise.all([
+      fetchSheet('KIWIFY'),
+      fetchSheet('META ADS')
+    ]);
+    allKiwify = kData;
+    allMeta = mData;
+
+    const allDates = kData.map(r => parseDate(r['Data de Criação'])).filter(Boolean).sort();
+    if (allDates.length) {
+      document.getElementById('date-from').value = allDates[0];
+      document.getElementById('date-to').value = allDates[allDates.length - 1];
+    }
+
+    render(allKiwify, allMeta);
+  } catch (e) {
+    document.querySelector('.cards').innerHTML = `<div style="grid-column:1/-1;padding:24px;color:var(--red);font-size:13px;">Erro ao carregar dados via Worker: ${e.message}. Verifique se os Secrets SHEET_ID e GOOGLE_SA_KEY estão configurados no Worker.</div>`;
+  }
+}
+
+init();
+</script>
+</body>
+</html>!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dashboard — Masterclass Alma Romântica</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;500;600&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #0f0e0c;
+    --bg2: #1a1814;
+    --bg3: #242118;
+    --border: rgba(255,255,255,0.07);
+    --border2: rgba(255,255,255,0.13);
+    --text: #f0ece4;
+    --text2: #9b9385;
+    --text3: #6b6358;
+    --gold: #c9a84c;
+    --gold2: #e8c96a;
+    --gold-dim: rgba(201,168,76,0.15);
+    --red: #e05c4b;
+    --green: #5aab7a;
+    --blue: #5a8fd4;
+    --radius: 10px;
+    --radius-lg: 16px;
+  }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'DM Sans', sans-serif;
+    font-size: 14px;
+    min-height: 100vh;
+  }
+
+  header {
+    background: var(--bg2);
+    border-bottom: 1px solid var(--border);
+    padding: 20px 32px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+  }
+
+  .header-left h1 {
+    font-family: 'Playfair Display', serif;
+    font-size: 20px;
+    font-weight: 500;
+    color: var(--gold2);
+    letter-spacing: 0.02em;
+  }
+
+  .header-left p {
+    font-size: 12px;
+    color: var(--text3);
+    margin-top: 2px;
+  }
+
+  .filters {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .filter-group {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 6px 12px;
+  }
+
+  .filter-group label {
+    font-size: 11px;
+    color: var(--text3);
+    white-space: nowrap;
+  }
+
+  .filter-group input[type="date"] {
+    background: transparent;
+    border: none;
+    color: var(--text);
+    font-family: 'DM Sans', sans-serif;
+    font-size: 13px;
+    cursor: pointer;
+    outline: none;
+    color-scheme: dark;
+  }
+
+  .btn-filter {
+    background: var(--gold);
+    border: none;
+    border-radius: var(--radius);
+    color: #0f0e0c;
+    font-family: 'DM Sans', sans-serif;
+    font-size: 12px;
+    font-weight: 500;
+    padding: 7px 16px;
+    cursor: pointer;
+    transition: background 0.15s;
+  }
+
+  .btn-filter:hover { background: var(--gold2); }
+
+  .btn-reset {
+    background: transparent;
+    border: 1px solid var(--border2);
+    border-radius: var(--radius);
+    color: var(--text2);
+    font-family: 'DM Sans', sans-serif;
+    font-size: 12px;
+    padding: 7px 12px;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+
+  .btn-reset:hover { border-color: var(--gold); color: var(--gold); }
+
+  .btn-refresh {
+    background: transparent;
+    border: 1px solid var(--border2);
+    border-radius: var(--radius);
+    color: var(--gold);
+    font-family: 'DM Sans', sans-serif;
+    font-size: 13px;
+    padding: 7px 14px;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .btn-refresh:hover { background: var(--gold-dim); border-color: var(--gold); }
+  .btn-refresh.loading { opacity: 0.5; pointer-events: none; animation: spin 1s linear infinite; }
+  @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+
+  main { padding: 28px 32px; max-width: 1400px; margin: 0 auto; }
+
+  .section-title {
+    font-size: 11px;
+    font-weight: 500;
+    color: var(--text3);
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    margin-bottom: 14px;
+    margin-top: 28px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .section-title::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: var(--border);
+  }
+
+  .cards {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 12px;
+  }
+
+  .card {
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: 18px 20px;
+    position: relative;
+    overflow: hidden;
+    transition: border-color 0.2s;
+  }
+
+  .card:hover { border-color: var(--border2); }
+
+  .card.highlight { border-color: rgba(201,168,76,0.3); }
+
+  .card::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 2px;
+    background: var(--gold);
+    opacity: 0;
+    transition: opacity 0.2s;
+  }
+
+  .card.highlight::before { opacity: 1; }
+
+  .card-label {
+    font-size: 11px;
+    color: var(--text3);
+    font-weight: 400;
+    margin-bottom: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+  }
+
+  .card-value {
+    font-family: 'Playfair Display', serif;
+    font-size: 26px;
+    font-weight: 500;
+    color: var(--text);
+    line-height: 1;
+  }
+
+  .card-value.gold { color: var(--gold2); }
+  .card-value.green { color: var(--green); }
+  .card-value.red { color: var(--red); }
+
+  .card-sub {
+    font-size: 11px;
+    color: var(--text3);
+    margin-top: 6px;
+  }
+
+  .charts-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+  }
+
+  .chart-box {
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: 20px 24px;
+  }
+
+  .chart-box.full { grid-column: 1 / -1; }
+
+  .chart-title {
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--text);
+    margin-bottom: 16px;
+  }
+
+  .chart-title span {
+    font-size: 11px;
+    color: var(--text3);
+    margin-left: 6px;
+    font-weight: 400;
+  }
+
+  .chart-wrap { position: relative; }
+
+  table { width: 100%; border-collapse: collapse; }
+
+  .table-wrap {
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    overflow: hidden;
+    margin-bottom: 16px;
+  }
+
+  .table-header {
+    padding: 16px 20px 12px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .table-header h3 {
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--text);
+  }
+
+  .table-header small { font-size: 11px; color: var(--text3); }
+
+  .tbl { width: 100%; }
+
+  .tbl th {
+    font-size: 10px;
+    font-weight: 500;
+    color: var(--text3);
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    padding: 10px 16px;
+    text-align: right;
+    background: var(--bg3);
+    border-bottom: 1px solid var(--border);
+    white-space: nowrap;
+  }
+
+  .tbl th:first-child { text-align: left; }
+
+  .tbl td {
+    padding: 9px 16px;
+    border-bottom: 1px solid var(--border);
+    font-size: 12px;
+    color: var(--text2);
+    text-align: right;
+    white-space: nowrap;
+  }
+
+  .tbl td:first-child { text-align: left; color: var(--text); font-size: 12px; max-width: 220px; overflow: hidden; text-overflow: ellipsis; }
+
+  .tbl tr:last-child td { border-bottom: none; }
+  .tbl tr:hover td { background: var(--bg3); }
+
+  .badge {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-size: 10px;
+    font-weight: 500;
+  }
+
+  .badge-paid { background: rgba(90,171,122,0.15); color: #5aab7a; }
+  .badge-refund { background: rgba(224,92,75,0.15); color: #e05c4b; }
+  .badge-wait { background: rgba(201,168,76,0.12); color: var(--gold); }
+  .badge-refuse { background: rgba(90,143,212,0.15); color: #5a8fd4; }
+  .badge-pago { background: rgba(90,171,122,0.15); color: #5aab7a; }
+  .badge-organico { background: rgba(90,143,212,0.15); color: #5a8fd4; }
+
+  .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .three-col { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; }
+
+  .loading {
+    text-align: center;
+    padding: 40px;
+    color: var(--text3);
+    font-size: 13px;
+  }
+
+  .legend-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 14px;
+    margin-bottom: 12px;
+    font-size: 11px;
+    color: var(--text3);
+  }
+
+  .legend-item {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+  }
+
+  .legend-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 2px;
+    flex-shrink: 0;
+  }
+
+  .roas-val { color: var(--green); font-weight: 500; }
+  .spend-val { color: var(--red); }
+  .cac-val { color: var(--blue); }
+
+  @media (max-width: 1100px) {
+    .cards { grid-template-columns: repeat(3, 1fr); }
+  }
+  @media (max-width: 768px) {
+    header { flex-direction: column; align-items: flex-start; gap: 14px; }
+    .cards { grid-template-columns: 1fr 1fr; }
+    .charts-grid, .two-col, .three-col { grid-template-columns: 1fr; }
+    .chart-box.full { grid-column: 1; }
+    main { padding: 16px; }
+    header { padding: 16px; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="header-left">
+    <h1>♩ Alma Romântica — Dashboard de Performance</h1>
+    <p id="header-range">Carregando dados...</p>
+    <p id="last-updated" style="font-size:11px;color:var(--text3);margin-top:2px;">—</p>
+  </div>
+  <div class="filters">
+    <div class="filter-group">
+      <label>De</label>
+      <input type="date" id="date-from">
+    </div>
+    <div class="filter-group">
+      <label>Até</label>
+      <input type="date" id="date-to">
+    </div>
+    <button class="btn-filter" onclick="applyFilter()">Filtrar</button>
+    <button class="btn-reset" onclick="resetFilter()">Limpar</button>
+    <button class="btn-refresh" onclick="refreshData()" id="btn-refresh" title="Buscar dados atualizados">↻ Atualizar</button>
+  </div>
+</header>
+
+<main>
+  <div class="section-title">Visão geral</div>
+
+  <div class="cards">
+    <div class="card highlight">
+      <div class="card-label">Total de Vendas</div>
+      <div class="card-value gold" id="c-vendas">—</div>
+      <div class="card-sub">pedidos pagos únicos</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Faturamento</div>
+      <div class="card-value" id="c-fat">—</div>
+      <div class="card-sub">apenas status = paid</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Investimento</div>
+      <div class="card-value" id="c-inv">—</div>
+      <div class="card-sub">Meta Ads (período)</div>
+    </div>
+    <div class="card">
+      <div class="card-label">ROAS</div>
+      <div class="card-value green" id="c-roas">—</div>
+      <div class="card-sub">tráfego pago (quente+frio)</div>
+    </div>
+    <div class="card">
+      <div class="card-label">CAC</div>
+      <div class="card-value" id="c-cac">—</div>
+      <div class="card-sub">tráfego pago (quente+frio)</div>
+    </div>
+  </div>
+
+  <div class="section-title" style="margin-top:32px">Evolução diária</div>
+
+  <div class="chart-box full" style="margin-bottom:16px">
+    <div class="chart-title">Vendas por dia <span>barras · contagem distinta de order_ref</span></div>
+    <div class="legend-row">
+      <div class="legend-item"><span class="legend-dot" style="background:#c9a84c"></span>Vendas</div>
+    </div>
+    <div class="chart-wrap" style="height:200px">
+      <canvas id="chartVendas" role="img" aria-label="Gráfico de barras: vendas por dia">Carregando...</canvas>
+    </div>
+  </div>
+
+  <div class="charts-grid">
+    <div class="chart-box">
+      <div class="chart-title">Faturamento por dia <span>linha</span></div>
+      <div class="chart-wrap" style="height:200px">
+        <canvas id="chartFat" role="img" aria-label="Faturamento diário">Carregando...</canvas>
+      </div>
+    </div>
+    <div class="chart-box">
+      <div class="chart-title">Investimento por dia <span>linha · Meta Ads</span></div>
+      <div class="chart-wrap" style="height:200px">
+        <canvas id="chartInv" role="img" aria-label="Investimento diário">Carregando...</canvas>
+      </div>
+    </div>
+
+  </div>
+
+  <div class="section-title" style="margin-top:32px">Por origem de tráfego · Conjunto de anúncios</div>
+
+  <div class="table-wrap">
+    <div class="table-header">
+      <h3>Desempenho por utm_medium / Adset</h3>
+      <small>Cruzamento KIWIFY × Meta Ads</small>
+    </div>
+    <table class="tbl" id="tbl-medium">
+      <thead>
+        <tr>
+          <th>Origem (utm_medium / Adset)</th>
+          <th>Investimento</th>
+          <th>Vendas</th>
+          <th>Faturamento</th>
+          <th>ROAS</th>
+          <th>CAC</th>
+        </tr>
+      </thead>
+      <tbody><tr><td colspan="6" class="loading">Carregando...</td></tr></tbody>
+    </table>
+  </div>
+
+  <div class="section-title">Por anúncio · utm_content / Ad Name</div>
+
+  <div class="table-wrap">
+    <div class="table-header">
+      <h3>Desempenho por utm_content / Ad Name</h3>
+      <small>Cruzamento KIWIFY × Meta Ads</small>
+    </div>
+    <table class="tbl" id="tbl-content">
+      <thead>
+        <tr>
+          <th>Anúncio (utm_content / Ad Name)</th>
+          <th>Impressões</th>
+          <th>CTR</th>
+          <th>Investimento</th>
+          <th>Vendas</th>
+          <th>Faturamento</th>
+          <th>ROAS</th>
+          <th>CAC</th>
+        </tr>
+      </thead>
+      <tbody><tr><td colspan="8" class="loading">Carregando...</td></tr></tbody>
+    </table>
+  </div>
+
+  <div class="section-title">Vendas por lote</div>
+
+  <div class="table-wrap">
+    <div class="table-header">
+      <h3>Segmentação por lote de preço</h3>
+      <small>Confrades · Alunos · Público geral</small>
+    </div>
+    <table class="tbl" id="tbl-lote">
+      <thead>
+        <tr>
+          <th>Lote</th>
+          <th>Vendas</th>
+          <th>Faturamento</th>
+          <th>Ticket médio</th>
+          <th>% das Vendas</th>
+        </tr>
+      </thead>
+      <tbody><tr><td colspan="5" class="loading">Carregando...</td></tr></tbody>
+    </table>
+  </div>
+
+  <div class="section-title">Outras análises</div>
+
+  <div class="three-col">
+    <div class="chart-box">
+      <div class="chart-title">Origem de tráfego</div>
+      <div class="chart-wrap" style="height:220px">
+        <canvas id="chartOrigem" role="img" aria-label="Pago vs Orgânico">Carregando...</canvas>
+      </div>
+    </div>
+    <div class="chart-box">
+      <div class="chart-title">Transações por status</div>
+      <div class="chart-wrap" style="height:220px">
+        <canvas id="chartStatus" role="img" aria-label="Transações por status">Carregando...</canvas>
+      </div>
+    </div>
+    <div class="chart-box">
+      <div class="chart-title">Vendas por método de pagamento</div>
+      <div class="chart-wrap" style="height:220px">
+        <canvas id="chartPayMethod" role="img" aria-label="Vendas por método de pagamento">Carregando...</canvas>
+      </div>
+    </div>
+  </div>
+
+
+
+  <p style="font-size:11px; color:var(--text3); margin-top:28px; text-align:center;">
+    Dados via Google Sheets API · Atualização manual via filtro de data · Masterclass Alma Romântica 2026
+  </p>
+</main>
+
+<script>
+const WORKER_URL = 'https://raspy-bush-2c66.henrscard.workers.dev';
+
+let allKiwify = [], allMeta = [], charts = {};
+
+async function fetchSheet(sheetName) {
+  const url = `${WORKER_URL}?sheet=${encodeURIComponent(sheetName)}`;
+  const res = await fetch(url);
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ error: res.statusText }));
+    throw new Error(err.error || res.statusText);
+  }
+  const text = await res.text();
+  return parseCSV(text);
+}
+
+function parseCSV(text) {
+  const lines = text.trim().split('\n');
+  const headers = parseCSVLine(lines[0]);
+  return lines.slice(1).map(line => {
+    const vals = parseCSVLine(line);
+    const obj = {};
+    headers.forEach((h, i) => obj[h.trim()] = (vals[i] || '').trim());
+    return obj;
+  });
+}
+
+function parseCSVLine(line) {
+  const result = [];
+  let cur = '', inQ = false;
+  for (let i = 0; i < line.length; i++) {
+    const c = line[i];
+    if (c === '"') {
+      if (inQ && line[i+1] === '"') { cur += '"'; i++; }
+      else inQ = !inQ;
+    } else if (c === ',' && !inQ) {
+      result.push(cur); cur = '';
+    } else cur += c;
+  }
+  result.push(cur);
+  return result;
+}
+
+function parseFat(str) {
+  if (!str) return 0;
+  const cleaned = str.replace(/R\$\s*/g, '').replace(/\./g, '').replace(',', '.').trim();
+  const n = parseFloat(cleaned);
+  return isNaN(n) ? 0 : n;
+}
+
+function parseSpend(str) {
+  if (!str) return 0;
+  const n = parseFloat(str.replace(',', '.'));
+  return isNaN(n) ? 0 : n;
+}
+
+function parseDate(str) {
+  if (!str) return null;
+  const match = str.match(/(\d{2})\/(\d{2})\/(\d{4})/);
+  if (match) return `${match[3]}-${match[2]}-${match[1]}`;
+  if (str.match(/^\d{4}-\d{2}-\d{2}/)) return str.substring(0, 10);
+  return null;
+}
+
+function fmtBRL(v) {
+  return 'R$ ' + v.toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+}
+
+function fmtN(v) {
+  return v.toLocaleString('pt-BR');
+}
+
+function getLote(fat) {
+  if (fat >= 80 && fat <= 100) return 'Confrades';
+  if (fat >= 101 && fat <= 180) return 'Alunos / ex-alunos';
+  if (fat >= 185) return 'Público geral';
+  return 'Outro';
+}
+
+function isPago(row) {
+  const fields = [
+    row['TrackingParameters_utm_source']  || '',
+    row['TrackingParameters_utm_medium']  || '',
+    row['TrackingParameters_src']         || '',
+    row['TrackingParameters_sck']         || '',
+    row['TrackingParameters_utm_campaign']|| '',
+  ];
+  return fields.some(f => {
+    const v = f.toLowerCase();
+    return v.startsWith('frio') || v.startsWith('quente') ||
+           v.includes('quente') || v.includes('frio');
+  });
+}
+
+function filterData(kiwify, meta, from, to) {
+  let kRows = kiwify;
+  let mRows = meta;
+  if (from) { kRows = kRows.filter(r => { const d = r['Data de Criação'] || r['created_at']; const dt = parseDate(d); return dt && dt >= from; }); }
+  if (to) { kRows = kRows.filter(r => { const d = r['Data de Criação'] || r['created_at']; const dt = parseDate(d); return dt && dt <= to; }); }
+  if (from) { mRows = mRows.filter(r => { const dt = parseDate(r['Date']); return dt && dt >= from; }); }
+  if (to) { mRows = mRows.filter(r => { const dt = parseDate(r['Date']); return dt && dt <= to; }); }
+  return { kRows, mRows };
+}
+
+const PRODUCT_NAME = 'Masterclass - Alma Romântica';
+
+function isAlmaRomantica(r) {
+  const p = (r['Product_product_name'] || '').toLowerCase();
+  return p.includes('alma rom') || p.includes('alma rom\u00e2ntica');
+}
+
+function getPaidRows(kRows) {
+  const seen = new Set();
+  return kRows.filter(r => {
+    if ((r['order_status'] || '').toLowerCase() !== 'paid') return false;
+    if (!isAlmaRomantica(r)) return false;
+    const ref = r['order_ref'];
+    if (!ref || seen.has(ref)) return false;
+    seen.add(ref);
+    return true;
+  });
+}
+
+function render(kiwify, meta) {
+  const from = document.getElementById('date-from').value || null;
+  const to = document.getElementById('date-to').value || null;
+  const { kRows, mRows } = filterData(kiwify, meta, from, to);
+
+  const paid = getPaidRows(kRows);
+  const totalVendas = paid.length;
+  const totalFat = paid.reduce((s, r) => s + parseFat(r['Faturamento']), 0);
+  const totalInv = mRows.reduce((s, r) => s + parseSpend(r['Spend (Cost, Amount Spent)']), 0);
+
+  // ROAS = faturamento de vendas pagas via tráfego pago / investimento total Meta Ads
+  // CAC = investimento total Meta Ads / vendas vindas de tráfego pago
+  const pagoRows = paid.filter(r => isPago(r));
+  const pagoFat = pagoRows.reduce((s, r) => s + parseFat(r['Faturamento']), 0);
+  const pagoVendas = pagoRows.length;
+  const roas = totalInv > 0 ? pagoFat / totalInv : 0;
+  const cac = pagoVendas > 0 ? totalInv / pagoVendas : 0;
+
+  document.getElementById('c-vendas').textContent = fmtN(totalVendas);
+  document.getElementById('c-fat').textContent = fmtBRL(totalFat);
+  document.getElementById('c-inv').textContent = fmtBRL(totalInv);
+  document.getElementById('c-roas').textContent = roas.toFixed(2) + 'x';
+  document.getElementById('c-cac').textContent = fmtBRL(cac);
+
+  const dates = [...new Set([
+    ...paid.map(r => parseDate(r['Data de Criação'])),
+    ...mRows.map(r => parseDate(r['Date']))
+  ].filter(Boolean))].sort();
+
+  const vendPorDia = {}, fatPorDia = {}, invPorDia = {}, vendPagoPorDia = {}, invPagoPorDia = {};
+
+  paid.forEach(r => {
+    const d = parseDate(r['Data de Criação']);
+    if (!d) return;
+    vendPorDia[d] = (vendPorDia[d] || 0) + 1;
+    fatPorDia[d] = (fatPorDia[d] || 0) + parseFat(r['Faturamento']);
+    if (isPago(r)) {
+      vendPagoPorDia[d] = (vendPagoPorDia[d] || 0) + 1;
+    }
+  });
+
+  mRows.forEach(r => {
+    const d = parseDate(r['Date']);
+    if (!d) return;
+    const spend = parseSpend(r['Spend (Cost, Amount Spent)']);
+    invPorDia[d] = (invPorDia[d] || 0) + spend;
+    invPagoPorDia[d] = (invPagoPorDia[d] || 0) + spend;
+  });
+
+  // CAC acumulado por dia: mesma lógica do card mas running
+  // Se não há vendas pagas em nenhum dia, usa total como fallback por dia de investimento
+  const totalPagoVendas = paid.filter(r => isPago(r)).length;
+  const lbls = dates.map(d => { const p = d.split('-'); return p[2] + '-' + p[1]; });
+
+  destroyChart('chartVendas');
+  charts.chartVendas = new Chart(document.getElementById('chartVendas'), {
     type: 'bar',
     data: {
-      labels,
+      labels: lbls,
       datasets: [{
-        label: 'Faturamento',
-        data: labels.map(l => Math.round(fatMap[l] * 100) / 100),
-        backgroundColor: labels.map((_, i) => palette[i % palette.length]),
-        borderRadius: 5,
-        barThickness: 32
+        label: 'Vendas',
+        data: dates.map(d => vendPorDia[d] || 0),
+        backgroundColor: '#c9a84c',
+        borderRadius: 4,
+        barThickness: 20,
       }]
     },
     options: {
       responsive: true, maintainAspectRatio: false,
       plugins: { legend: { display: false } },
       scales: {
-        x: { ticks: { color: '#9b9385', font: { size: 11 } }, grid: { color: 'rgba(255,255,255,0.04)' } },
+        x: { ticks: { color: '#6b6358', font: { size: 10 } }, grid: { color: 'rgba(255,255,255,0.04)' } },
+        y: { ticks: { color: '#6b6358', font: { size: 10 } }, grid: { color: 'rgba(255,255,255,0.04)' }, beginAtZero: true }
+      }
+    }
+  });
+
+  destroyChart('chartFat');
+  charts.chartFat = new Chart(document.getElementById('chartFat'), {
+    type: 'line',
+    data: {
+      labels: lbls,
+      datasets: [{
+        label: 'Faturamento',
+        data: dates.map(d => Math.round(fatPorDia[d] || 0)),
+        borderColor: '#c9a84c',
+        backgroundColor: 'rgba(201,168,76,0.08)',
+        pointBackgroundColor: '#c9a84c',
+        pointRadius: 3,
+        tension: 0.3, fill: true
+      }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false } },
+      scales: {
+        x: { ticks: { color: '#6b6358', font: { size: 10 } }, grid: { color: 'rgba(255,255,255,0.04)' } },
+        y: { ticks: { color: '#6b6358', font: { size: 10 }, callback: v => 'R$' + (v/1).toLocaleString('pt-BR') }, grid: { color: 'rgba(255,255,255,0.04)' }, beginAtZero: true }
+      }
+    }
+  });
+
+  destroyChart('chartInv');
+  charts.chartInv = new Chart(document.getElementById('chartInv'), {
+    type: 'line',
+    data: {
+      labels: lbls,
+      datasets: [{
+        label: 'Investimento',
+        data: dates.map(d => Math.round((invPorDia[d] || 0) * 100) / 100),
+        borderColor: '#6b6358',
+        backgroundColor: 'rgba(107,99,88,0.08)',
+        pointBackgroundColor: '#6b6358',
+        pointRadius: 3,
+        tension: 0.3, fill: true
+      }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false } },
+      scales: {
+        x: { ticks: { color: '#6b6358', font: { size: 10 } }, grid: { color: 'rgba(255,255,255,0.04)' } },
         y: { ticks: { color: '#6b6358', font: { size: 10 }, callback: v => 'R$' + v.toLocaleString('pt-BR') }, grid: { color: 'rgba(255,255,255,0.04)' }, beginAtZero: true }
       }
     }
   });
+
+
+
+  renderTblMedium(paid, mRows);
+  renderTblContent(paid, mRows);
+  renderTblLote(paid);
+  renderChartOrigem(paid);
+  renderChartStatus(kRows, paid);
+  renderChartPayMethod(paid);
+
+  const minDate = dates[0] || '';
+  const maxDate = dates[dates.length - 1] || '';
+  document.getElementById('header-range').textContent = minDate && maxDate ? `Período: ${minDate} → ${maxDate}` : 'Todos os dados';
+  const now = new Date();
+  document.getElementById('last-updated').textContent = 'Atualizado em ' + now.toLocaleDateString('pt-BR') + ' às ' + now.toLocaleTimeString('pt-BR', {hour:'2-digit', minute:'2-digit'});
+}
+
+function renderTblMedium(paid, mRows) {
+  const mediumMap = {};
+  paid.forEach(r => {
+    const m = r['TrackingParameters_utm_medium'] || 'orgânico';
+    if (!mediumMap[m]) mediumMap[m] = { vendas: 0, fat: 0 };
+    mediumMap[m].vendas++;
+    mediumMap[m].fat += parseFat(r['Faturamento']);
+  });
+
+  const adsetSpend = {};
+  mRows.forEach(r => {
+    const a = r['Adset Name'] || '';
+    if (!adsetSpend[a]) adsetSpend[a] = 0;
+    adsetSpend[a] += parseSpend(r['Spend (Cost, Amount Spent)']);
+  });
+
+  const rows = Object.entries(mediumMap).map(([m, d]) => {
+    const spend = adsetSpend[m] || 0;
+    const roas = spend > 0 ? d.fat / spend : null;
+    const cac = d.vendas > 0 && spend > 0 ? spend / d.vendas : null;
+    return { m, ...d, spend, roas, cac };
+  }).sort((a, b) => b.fat - a.fat);
+
+  const tbody = document.querySelector('#tbl-medium tbody');
+  tbody.innerHTML = rows.map(r => `
+    <tr>
+      <td>${r.m}</td>
+      <td>${r.spend > 0 ? fmtBRL(r.spend) : '<span style="color:var(--text3)">—</span>'}</td>
+      <td>${fmtN(r.vendas)}</td>
+      <td>${fmtBRL(r.fat)}</td>
+      <td>${r.roas !== null ? '<span class="roas-val">' + r.roas.toFixed(2) + 'x</span>' : '<span style="color:var(--text3)">—</span>'}</td>
+      <td>${r.cac !== null ? fmtBRL(r.cac) : '<span style="color:var(--text3)">—</span>'}</td>
+    </tr>
+  `).join('');
+}
+
+function renderTblContent(paid, mRows) {
+  const contentMap = {};
+  paid.forEach(r => {
+    const c = r['TrackingParameters_utm_content'] || 'sem utm_content';
+    if (!contentMap[c]) contentMap[c] = { vendas: 0, fat: 0 };
+    contentMap[c].vendas++;
+    contentMap[c].fat += parseFat(r['Faturamento']);
+  });
+
+  const adMap = {};
+  mRows.forEach(r => {
+    const a = r['Ad Name'] || '';
+    if (!adMap[a]) adMap[a] = { spend: 0, imp: 0, clicks: 0 };
+    adMap[a].spend += parseSpend(r['Spend (Cost, Amount Spent)']);
+    adMap[a].imp += parseInt(r['Impressions'] || 0);
+    adMap[a].clicks += parseInt(r['Clicks'] || 0);
+  });
+
+  const allKeys = new Set([...Object.keys(contentMap), ...Object.keys(adMap)]);
+  const rows = [...allKeys].map(k => {
+    const kw = contentMap[k] || { vendas: 0, fat: 0 };
+    const mw = adMap[k] || { spend: 0, imp: 0, clicks: 0 };
+    const ctr = mw.imp > 0 ? (mw.clicks / mw.imp * 100) : 0;
+    const roas = mw.spend > 0 ? kw.fat / mw.spend : null;
+    const cac = kw.vendas > 0 && mw.spend > 0 ? mw.spend / kw.vendas : null;
+    return { k, ...kw, ...mw, ctr, roas, cac };
+  }).sort((a, b) => b.fat - a.fat).slice(0, 30);
+
+  const tbody = document.querySelector('#tbl-content tbody');
+  tbody.innerHTML = rows.map(r => `
+    <tr>
+      <td title="${r.k}">${r.k.length > 40 ? r.k.substring(0, 40) + '…' : r.k}</td>
+      <td>${r.imp > 0 ? fmtN(r.imp) : '<span style="color:var(--text3)">—</span>'}</td>
+      <td>${r.imp > 0 ? r.ctr.toFixed(2) + '%' : '<span style="color:var(--text3)">—</span>'}</td>
+      <td>${r.spend > 0 ? fmtBRL(r.spend) : '<span style="color:var(--text3)">—</span>'}</td>
+      <td>${fmtN(r.vendas)}</td>
+      <td>${fmtBRL(r.fat)}</td>
+      <td>${r.roas !== null ? '<span class="roas-val">' + r.roas.toFixed(2) + 'x</span>' : '<span style="color:var(--text3)">—</span>'}</td>
+      <td>${r.cac !== null ? fmtBRL(r.cac) : '<span style="color:var(--text3)">—</span>'}</td>
+    </tr>
+  `).join('');
+}
+
+function renderTblLote(paid) {
+  const lotes = { 'Confrades': { vendas: 0, fat: 0, label: 'R$ 80 – 100' }, 'Alunos / ex-alunos': { vendas: 0, fat: 0, label: 'R$ 101 – 180' }, 'Público geral': { vendas: 0, fat: 0, label: 'R$ 185+' }, 'Outro': { vendas: 0, fat: 0, label: '< R$ 80 ou sem fat.' } };
+  paid.forEach(r => {
+    const fat = parseFat(r['Faturamento']);
+    const lote = getLote(fat);
+    if (lotes[lote]) { lotes[lote].vendas++; lotes[lote].fat += fat; }
+  });
+
+  const total = paid.length || 1;
+  const tbody = document.querySelector('#tbl-lote tbody');
+  tbody.innerHTML = Object.entries(lotes).filter(([, d]) => d.vendas > 0).map(([nome, d]) => `
+    <tr>
+      <td><strong>${nome}</strong></td>
+      <td>${fmtN(d.vendas)}</td>
+      <td>${fmtBRL(d.fat)}</td>
+      <td>${d.vendas > 0 ? fmtBRL(d.fat / d.vendas) : '—'}</td>
+      <td>${((d.vendas / total) * 100).toFixed(1)}%</td>
+    </tr>
+  `).join('') || '<tr><td colspan="5" class="loading">Nenhum dado</td></tr>';
+}
+
+function renderChartOrigem(paid) {
+  const pago = paid.filter(r => isPago(r)).length;
+  const org = paid.length - pago;
+  destroyChart('chartOrigem');
+  charts.chartOrigem = new Chart(document.getElementById('chartOrigem'), {
+    type: 'doughnut',
+    data: {
+      labels: ['Pago (quente/frio)', 'Orgânico'],
+      datasets: [{
+        data: [pago, org],
+        backgroundColor: ['#c9a84c', '#5a8fd4'],
+        borderColor: '#1a1814',
+        borderWidth: 3,
+        hoverOffset: 6
+      }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      cutout: '60%',
+      plugins: {
+        legend: { position: 'bottom', labels: { color: '#9b9385', font: { size: 11 }, padding: 12, boxWidth: 12 } }
+      }
+    }
+  });
+}
+
+function renderChartStatus(kRows, paidAlma) {
+  // status de todas as transações Alma Romântica (inclui tentativas, recusados etc)
+  const almaRows = kRows.filter(r => isAlmaRomantica(r));
+  const statusMap = {};
+  almaRows.forEach(r => {
+    const s = r['order_status'];
+    if (!s) return;
+    statusMap[s] = (statusMap[s] || 0) + 1;
+  });
+  const labels = Object.keys(statusMap);
+  const colors = { paid: '#5aab7a', refunded: '#e05c4b', waiting_payment: '#c9a84c', refused: '#5a8fd4' };
+  destroyChart('chartStatus');
+  charts.chartStatus = new Chart(document.getElementById('chartStatus'), {
+    type: 'doughnut',
+    data: {
+      labels: labels.map(l => l === 'paid' ? 'Pago' : l === 'refunded' ? 'Reembolsado' : l === 'waiting_payment' ? 'Aguardando' : l === 'refused' ? 'Recusado' : l),
+      datasets: [{
+        data: labels.map(l => statusMap[l]),
+        backgroundColor: labels.map(l => colors[l] || '#888'),
+        borderColor: '#1a1814',
+        borderWidth: 3
+      }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      cutout: '60%',
+      plugins: {
+        legend: { position: 'bottom', labels: { color: '#9b9385', font: { size: 11 }, padding: 10, boxWidth: 12 } }
+      }
+    }
+  });
+}
+
+function renderChartCard(paid) {
+  const ccRows = paid.filter(r => (r['payment_method'] || '').toLowerCase() === 'credit_card');
+  const total = ccRows.length;
+  const approved = ccRows.filter(r => (r['order_status'] || '').toLowerCase() === 'paid').length;
+  const refused = ccRows.filter(r => (r['order_status'] || '').toLowerCase() === 'refused').length;
+  const other = total - approved - refused;
+  destroyChart('chartCard');
+  charts.chartCard = new Chart(document.getElementById('chartCard'), {
+    type: 'doughnut',
+    data: {
+      labels: ['Aprovado', 'Recusado', 'Outros'],
+      datasets: [{
+        data: [approved, refused, other].filter((_, i) => [approved, refused, other][i] > 0),
+        backgroundColor: ['#5aab7a', '#e05c4b', '#888'].filter((_, i) => [approved, refused, other][i] > 0),
+        borderColor: '#1a1814',
+        borderWidth: 3
+      }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      cutout: '60%',
+      plugins: {
+        legend: { position: 'bottom', labels: { color: '#9b9385', font: { size: 11 }, padding: 10, boxWidth: 12 } }
+      }
+    }
+  });
+}
+
+function renderChartPayMethod(paid) {
+  const methodMap = {}, fatMap = {};
+  paid.forEach(r => {
+    let m = (r['payment_method'] || 'outro').toLowerCase();
+    if (m === 'credit_card') m = 'Cartão de crédito';
+    else if (m === 'pix') m = 'Pix';
+    else if (m === 'boleto') m = 'Boleto';
+    else m = m.charAt(0).toUpperCase() + m.slice(1);
+    methodMap[m] = (methodMap[m] || 0) + 1;
+    fatMap[m] = (fatMap[m] || 0) + parseFat(r['Faturamento']);
+  });
+  const labels = Object.keys(methodMap).sort((a, b) => methodMap[b] - methodMap[a]);
+  const palette = ['#c9a84c', '#5a8fd4', '#5aab7a', '#e05c4b', '#9b9385'];
+
+  destroyChart('chartPayMethod');
+  charts.chartPayMethod = new Chart(document.getElementById('chartPayMethod'), {
+    type: 'doughnut',
+    data: {
+      labels,
+      datasets: [{
+        data: labels.map(l => methodMap[l]),
+        backgroundColor: labels.map((_, i) => palette[i % palette.length]),
+        borderColor: '#1a1814',
+        borderWidth: 3,
+        hoverOffset: 6
+      }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      cutout: '60%',
+      plugins: {
+        legend: { position: 'bottom', labels: { color: '#9b9385', font: { size: 11 }, padding: 12, boxWidth: 12 } }
+      }
+    }
+  });
+
+
 }
 
 function destroyChart(id) {
