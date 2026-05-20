@@ -1,5 +1,7 @@
 # 🎼 Dashboard — Masterclass Alma Romântica
 
+🔗 **[Acessar dashboard ao vivo](https://suporteb16-collab.github.io/dashboard-ar0526/)**
+
 Dashboard de performance de vendas vs. investimento em Meta Ads para o produto **Masterclass Alma Romântica** (Escola do Ouvido / Confraria Musical Hélicon).
 
 ---
@@ -18,8 +20,8 @@ README.md                       ← Este arquivo
 ### Cards de visão geral
 | Métrica | Lógica |
 |---|---|
-| Total de Vendas | Contagem distinta de `order_ref` onde `order_status = paid` |
-| Total de Faturamento | Soma da coluna `Faturamento` (KIWIFY) para `order_status = paid` |
+| Total de Vendas | Contagem distinta de `order_ref` onde `order_status = paid` **e** `Product_product_name` contém "Alma Romântica" |
+| Total de Faturamento | Soma da coluna `Faturamento` (KIWIFY) para `order_status = paid` e produto Alma Romântica |
 | Total de Investimento | Soma de `Spend (Cost, Amount Spent)` (META ADS) no período |
 | ROAS | `Faturamento pago / Investimento` — apenas onde `utm_medium = quente ou frio` |
 | CAC | `Investimento / Vendas pagas` — apenas onde `utm_medium = quente ou frio` |
