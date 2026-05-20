@@ -649,13 +649,17 @@ function getLote(fat) {
 
 function isPago(row) {
   const fields = [
-    row['TrackingParameters_utm_source'] || '',
-    row['TrackingParameters_utm_medium'] || '',
-    row['TrackingParameters_src']        || '',
-    row['TrackingParameters_sck']        || '',
+    row['TrackingParameters_utm_source']  || '',
+    row['TrackingParameters_utm_medium']  || '',
+    row['TrackingParameters_src']         || '',
+    row['TrackingParameters_sck']         || '',
     row['TrackingParameters_utm_campaign']|| '',
   ];
-  return fields.some(f => f.toLowerCase().includes('quente') || f.toLowerCase().includes('frio'));
+  return fields.some(f => {
+    const v = f.toLowerCase();
+    return v.startsWith('frio') || v.startsWith('quente') ||
+           v.includes('quente') || v.includes('frio');
+  });
 }
 
 function filterData(kiwify, meta, from, to) {
