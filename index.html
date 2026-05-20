@@ -649,7 +649,9 @@ function getLote(fat) {
 
 function isPago(row) {
   const src = (row['TrackingParameters_utm_source'] || '').toLowerCase();
-  return src.includes('quente') || src.includes('frio');
+  const med = (row['TrackingParameters_utm_medium'] || '').toLowerCase();
+  return src.includes('quente') || src.includes('frio') ||
+         med.includes('quente') || med.includes('frio');
 }
 
 function filterData(kiwify, meta, from, to) {
@@ -731,9 +733,9 @@ function render(kiwify, meta) {
   });
 
   const cacPorDia = dates.map(d => {
-    const inv = invPagoPorDia[d] || 0;
+    const inv = invPorDia[d] || 0;
     const v = vendPagoPorDia[d] || 0;
-    return v > 0 ? inv / v : 0;
+    return v > 0 ? inv / v : null;
   });
 
   const lbls = dates.map(d => { const p = d.split('-'); return p[2] + '-' + p[1]; });
@@ -794,9 +796,9 @@ function render(kiwify, meta) {
       datasets: [{
         label: 'Investimento',
         data: dates.map(d => Math.round((invPorDia[d] || 0) * 100) / 100),
-        borderColor: '#e05c4b',
-        backgroundColor: 'rgba(224,92,75,0.08)',
-        pointBackgroundColor: '#e05c4b',
+        borderColor: '#6b6358',
+        backgroundColor: 'rgba(107,99,88,0.08)',
+        pointBackgroundColor: '#6b6358',
         pointRadius: 3,
         tension: 0.3, fill: true
       }]
@@ -819,20 +821,21 @@ function render(kiwify, meta) {
       datasets: [
         {
           label: 'CAC',
-          data: cacPorDia.map(v => Math.round(v * 100) / 100),
+          data: cacPorDia.map(v => v !== null ? Math.round(v * 100) / 100 : null),
           borderColor: '#5a8fd4',
           backgroundColor: 'rgba(90,143,212,0.06)',
           pointBackgroundColor: '#5a8fd4',
           pointRadius: 3,
           tension: 0.3,
           fill: true,
+          spanGaps: false,
           yAxisID: 'yCAC'
         },
         {
           label: 'Investimento',
           data: dates.map(d => Math.round((invPorDia[d] || 0) * 100) / 100),
-          borderColor: '#6b6358',
-          pointBackgroundColor: '#6b6358',
+          borderColor: '#4a4540',
+          pointBackgroundColor: '#4a4540',
           pointRadius: 2,
           tension: 0.3,
           borderDash: [4, 3],
