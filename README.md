@@ -1,171 +1,155 @@
-# 🎼 Dashboard — Masterclass Alma Romântica
+# 🎼 Dashboard Masterclass — Maestro Thiago Santos
 
-🔗 **[Acessar dashboard ao vivo](https://suporteb16-collab.github.io/dashboard-ar0526/)**
-
-Dashboard de performance de vendas vs. investimento em Meta Ads para o produto **Masterclass Alma Romântica** (Escola do Ouvido / Confraria Musical Hélicon).
+Dashboard de performance para as Masterclass do Maestro Thiago Santos, desenvolvido pela [Agência B16](https://agenciab16.com.br).
 
 ---
 
-## 📁 Estrutura
+## 🌐 URL
 
 ```
-dashboard-alma-romantica.html   ← Arquivo principal (standalone)
-README.md                       ← Este arquivo
+https://suporteb16-collab.github.io/dashboard-masterclass-maestro/
 ```
 
 ---
 
-## 📊 Métricas e funcionalidades
+## 🏗️ Arquitetura
 
-### Cards de visão geral
-| Métrica | Lógica |
-|---|---|
-| Total de Vendas | Contagem distinta de `order_ref` onde `order_status = paid` **e** `Product_product_name` contém "Alma Romântica" |
-| Total de Faturamento | Soma da coluna `Faturamento` (KIWIFY) para `order_status = paid` e produto Alma Romântica |
-| Total de Investimento | Soma de `Spend (Cost, Amount Spent)` (META ADS) no período |
-| ROAS | `Faturamento pago / Investimento` — apenas onde `utm_medium = quente ou frio` |
-| CAC | `Investimento / Vendas pagas` — apenas onde `utm_medium = quente ou frio` |
-
-### Gráficos de evolução diária
-- **Vendas por dia** — barras, contagem distinta de `order_ref`
-- **Faturamento por dia** — linha
-- **Investimento por dia** — linha (Meta Ads)
-- **CAC por dia** — linha com sobreposição de investimento
-
-### Tabelas cruzadas
-1. **Por utm_medium / Adset Name** — Investimento, Vendas, Faturamento, ROAS, CAC
-2. **Por utm_content / Ad Name** — Impressões, CTR, Investimento, Vendas, Faturamento, ROAS, CAC
-3. **Por lote de preço**:
-   - Confrades: `Faturamento` entre R$ 80 e R$ 100
-   - Alunos / ex-alunos: `Faturamento` entre R$ 101 e R$ 180
-   - Público geral: `Faturamento` ≥ R$ 185
-
-### Outros gráficos (rosca)
-- **Origem de tráfego** — Pago (quente/frio) vs. Orgânico
-- **Transações por status** — paid / refunded / waiting_payment / refused
-- **Aprovação de cartão** — apenas transações com `payment_method = credit_card`
-
-### Filtro de período
-Controle de data de início e fim aplicado sobre ambas as bases (KIWIFY e META ADS).
+```
+Google Sheets (privada)
+      ↓
+Cloudflare Worker (raspy-bush-2c66.henrscard.workers.dev)
+      ↓
+Dashboard HTML (GitHub Pages)
+```
 
 ---
 
-## ⚙️ Arquitetura — Cloudflare Worker
+## 📋 Planilha
 
-Os dados são buscados via **Cloudflare Worker** (proxy seguro), que autentica na Google Sheets API com uma Service Account. A planilha pode permanecer **privada**.
+**ID:** `1bPxq4nmFicmJihL1uKtnQMcgXSD0hYIZwgL14xPSL-s`
 
-**Worker:** `https://raspy-bush-2c66.henrscard.workers.dev`
+### Abas utilizadas
 
-**Secrets configurados no Worker:**
-| Secret | Valor |
+| Aba | Conteúdo |
 |---|---|
-| `SHEET_ID` | ID da planilha Google |
-| `GOOGLE_SA_KEY` | JSON completo da Service Account |
+| `KIWIFY` | Dados de vendas (todos os produtos) |
+| `META ADS` | Dados de campanhas Meta Ads |
+| `TAG_CAMPANHA` | Relação tag × produto × período |
 
-**Service Account com acesso à planilha (Visualizador):**
-`cromador-dashboard@analise-de-dados-mallet.iam.gserviceaccount.com`
+### Estrutura da aba `TAG_CAMPANHA`
 
-A planilha **não precisa ser pública**. O Worker autentica via JWT gerado a partir da chave da Service Account.
+| Coluna | Descrição | Exemplo |
+|---|---|---|
+| `tag_campanha` | Identificador único da campanha | `AR0526` |
+| `tag_metaads_masterclass` | Tag no Campaign Name (Meta) | `[AR]` |
+| `tag_metaads_produto_principal` | Tag do produto principal (Meta) | `[CH]` |
+| `produto_masterclass` | Nome exato do produto na Kiwify | `Masterclass - Alma Romântica` |
+| `produto_principal` | Nome exato do produto principal | `Confraria Musical Hélicon` |
+| `data_inicio` | Data de início da campanha | `2026-05-12` |
+| `data_fim` | Data de fim da campanha | `2026-06-01` |
+
+### Campanhas configuradas
+
+| Tag | Masterclass | Produto Principal | Período |
+|---|---|---|---|
+| AR0526 | Masterclass - Alma Romântica | — | 12/05 a 01/06/2026 |
+| ANEA0726 | Masterclass - A Noite e o Êxtase da Alma | Confraria Musical Hélicon | 01/07 a 15/07/2026 |
+
+---
+
+## ⚙️ Cloudflare Worker
+
+**Worker:** `raspy-bush-2c66.henrscard.workers.dev`
+
+### Atualização necessária
+
+Adicionar `TAG_CAMPANHA` à lista `ALLOWED_SHEETS` no código do Worker (arquivo `worker.js` neste repositório).
+
+### Secrets configurados
+
+| Secret | Descrição |
+|---|---|
+| `SHEET_ID` | ID da planilha Google Sheets |
+| `GOOGLE_SA_KEY` | JSON completo da Service Account GCP |
+
+---
+
+## 📊 Estrutura do Dashboard
+
+### 1. Big Numbers
+- **Ingressos Vendidos** — pedidos pagos únicos (product = masterclass)
+- **Faturamento Masterclass** — soma de `Faturamento` (paid)
+- **Investimento** — soma de `Spend` do Meta Ads no período
+- **ROAS** — faturamento / investimento
+- **CAC** — investimento / ingressos vendidos
+
+### 2. Funil de Conversão
+Todos os dados são do Meta Ads, exceto a última etapa (Kiwify):
+
+```
+Investimento (R$)
+    ↓ impressões
+Impressões → CPM
+    ↓ CTR
+Cliques → CPC
+    ↓ % dos cliques
+Página do Evento (LPV) → CPV
+    ↓ % da página
+Checkout Iniciado → CP Checkout
+    ↓ % dos checkouts
+Ingressos Vendidos → CAC
+```
+
+### 3. Evolução Diária
+- Ingressos por dia (barras)
+- Faturamento por dia (linha)
+- Investimento por dia (linha)
+
+### 4. Por Origem de Tráfego
+- Tabela `utm_medium` × Adset com Investimento, Ingressos, Faturamento, ROAS, CAC
+- Tabela `utm_content` × Ad Name com Impressões, CTR, Investimento, Ingressos, Faturamento, ROAS, CAC
+
+### 5. Produto Principal Associado
+Aparece apenas quando uma masterclass com produto principal associado está selecionada:
+- Vendas do produto principal
+- Faturamento, ticket médio, taxa de conversão (vendas produto / ingressos mc)
+- ROAS combinado (fat. mc + fat. produto) / investimento
+
+### 6. Outras Análises
+- Origem de tráfego (Pago vs Orgânico)
+- Transações por status (paid / refunded / waiting / refused)
+- Método de pagamento
+
+### 7. Vendas por Faixa de Preço (Lote)
+- Confrades: R$ 80–100
+- Alunos / ex-alunos: R$ 101–180
+- Público geral: R$ 185+
+
+---
+
+## 🔽 Filtros disponíveis
+
+| Filtro | Descrição |
+|---|---|
+| Masterclass | Filtra por campanha (lido dinamicamente da aba `TAG_CAMPANHA`) |
+| Produto Principal | Filtra por produto associado |
+| Data (de/até) | Filtra período de análise |
 
 ---
 
 ## 🚀 Deploy
 
-### Cloudflare Pages
-
-1. Faça o push do repositório para o GitHub (veja abaixo)
-2. Acesse [pages.cloudflare.com](https://pages.cloudflare.com)
-3. Clique em **Create a project → Connect to Git**
-4. Selecione o repositório
-5. Configurações de build:
-   - **Framework preset:** None
-   - **Build command:** *(vazio)*
-   - **Build output directory:** `/` (raiz)
-6. Clique em **Save and Deploy**
-
-O arquivo `dashboard-alma-romantica.html` será servido automaticamente. Acesse via URL fornecida pela Cloudflare (ex: `alma-romantica.pages.dev`).
-
-Para usar como `index.html`, renomeie o arquivo ou crie um redirect.
+1. Suba `index.html`, `worker.js` e `README.md` no repositório
+2. Atualize o Worker no Cloudflare com o novo `worker.js` (adiciona aba `TAG_CAMPANHA`)
+3. Ative o GitHub Pages: **Settings → Pages → branch `main` / root**
 
 ---
 
-### GitHub
+## 📦 Adicionar nova Masterclass
 
-```bash
-# Inicializar repositório
-git init
-git add .
-git commit -m "feat: dashboard Alma Romântica"
-
-# Criar repositório no GitHub (via CLI ou interface)
-gh repo create alma-romantica-dashboard --public --source=. --push
-
-# Ou via remote manual:
-git remote add origin https://github.com/SEU_USUARIO/alma-romantica-dashboard.git
-git branch -M main
-git push -u origin main
-```
-
-Para atualizar após mudanças:
-```bash
-git add .
-git commit -m "update: ajuste no dashboard"
-git push
-```
+1. Adicione uma linha na aba `TAG_CAMPANHA` da planilha
+2. O filtro do dashboard aparece automaticamente — nenhuma alteração no código necessária
 
 ---
 
-## 🗂️ Estrutura das abas esperadas na planilha
-
-### Aba `KIWIFY`
-Colunas relevantes utilizadas:
-- `order_ref` — identificador único do pedido
-- `order_status` — filtro principal (`paid`)
-- `Faturamento` — valor em BRL (formato `R$ 185,64`)
-- `Data de Criação` — data da transação
-- `TrackingParameters_utm_medium` — origem: `quente`, `frio`, ou orgânico
-- `TrackingParameters_utm_content` — identificador do anúncio
-- `payment_method` — `credit_card`, `pix`, etc.
-- `card_type`, `card_rejection_reason`
-
-### Aba `META ADS`
-Colunas relevantes:
-- `Date` — data do gasto
-- `Adset Name` — conjunto de anúncios (cruzado com `utm_medium`)
-- `Ad Name` — anúncio (cruzado com `utm_content`)
-- `Spend (Cost, Amount Spent)` — valor gasto em BRL
-- `Impressions` — impressões
-- `Clicks` — cliques (usado para calcular CTR)
-
----
-
-## 🛠️ Personalização
-
-Para trocar a planilha, edite a linha no `<script>` do HTML:
-```js
-const SHEET_ID = '1bPxq4nmFicmJihL1uKtnQMcgXSD0hYIZwgL14xPSL-s';
-```
-
-Para ajustar os intervalos de lote:
-```js
-function getLote(fat) {
-  if (fat >= 80 && fat <= 100) return 'Confrades';
-  if (fat >= 101 && fat <= 180) return 'Alunos / ex-alunos';
-  if (fat >= 185) return 'Público geral';
-  return 'Outro';
-}
-```
-
----
-
-## 📝 Observações
-
-- O dashboard lê dados **em tempo real** da planilha sempre que é aberto ou o filtro é aplicado
-- Não há backend — tudo roda no browser do cliente
-- O cruzamento KIWIFY × META ADS por `utm_medium`/`utm_content` depende de correspondência exata de nomes entre as colunas
-- Linhas com `order_ref` duplicado são deduplicadas (conta apenas a mais recente com `status = paid`)
-- Registros sem `Faturamento` ou com `#VALUE!` são ignorados
-
----
-
-*Desenvolvido para: Escola do Ouvido / Confraria Musical Hélicon — maio de 2026*
+**Agência B16** — [henrscard@gmail.com](mailto:henrscard@gmail.com)
